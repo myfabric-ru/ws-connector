@@ -19,7 +19,7 @@ setup(
     description='Программа для взаимодействия 3D принтеров и  CRM MyFabric',
     long_description=open('readme.md').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/khonik/myfabric',
+    url='https://github.com/myfabric-ru/ws-connector',
     classifiers=[
         'Programming Language :: Python :: 3',
     ],
