@@ -1,0 +1,2 @@
+[console_scripts]
+myfabric-connect = myfabric.main:start

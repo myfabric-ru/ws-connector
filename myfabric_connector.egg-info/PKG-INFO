@@ -1,0 +1,22 @@
+Metadata-Version: 2.1
+Name: myfabric-connector
+Version: 0.1.0
+Summary: Программа для взаимодействия 3D принтеров и  CRM MyFabric
+Home-page: https://github.com/myfabric-ru/ws-connector
+Author: Khonik
+Author-email: khonikdev@gmail.com
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+Requires-Dist: websockets
+
+# MyFabric 
+
+программа для соединения принтера с CRM
+
+
+## Установка
+
+```bash
+pip install myfabric-connector
+myfabric-connect <local_url> <remote_url>

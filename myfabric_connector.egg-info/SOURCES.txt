@@ -1,0 +1,10 @@
+pyproject.toml
+setup.py
+myfabric/__init__.py
+myfabric/main.py
+myfabric_connector.egg-info/PKG-INFO
+myfabric_connector.egg-info/SOURCES.txt
+myfabric_connector.egg-info/dependency_links.txt
+myfabric_connector.egg-info/entry_points.txt
+myfabric_connector.egg-info/requires.txt
+myfabric_connector.egg-info/top_level.txt
