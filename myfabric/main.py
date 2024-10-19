@@ -1,78 +1,142 @@
 # myfabric/main.py
 
+import sys
 import asyncio
 import websockets
-import sys
 import logging
+import threading
+import time
+import pusherclient
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('myfabric')
 
-
-async def proxy(local_url, remote_url):
-    delay = 1  # Начальная задержка переподключения в секундах
-    max_delay = 60  # Максимальная задержка переподключения в секундах
-    while True:
-        try:
-            async with websockets.connect(local_url) as local_ws, websockets.connect(remote_url) as remote_ws:
-                logger.info("Установлено соединение с локальным и удаленным вебсокетами")
-                delay = 1  # Сброс задержки при успешном подключении
-                await asyncio.gather(
-                    forward_messages(local_ws, remote_ws, 'local_to_remote'),
-                    forward_messages(remote_ws, local_ws, 'remote_to_local'),
-                    keep_alive(local_ws, 'local'),
-                    keep_alive(remote_ws, 'remote'),
-                )
-        except (websockets.exceptions.ConnectionClosedError, websockets.exceptions.InvalidStatusCode,
-                ConnectionRefusedError) as e:
-            logger.warning(f"Соединение прервано: {e}. Переподключение через {delay} секунд...")
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, max_delay)  # Увеличиваем задержку до максимума
-        except Exception as e:
-            logger.error(f"Произошла непредвиденная ошибка: {e}", exc_info=True)
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, max_delay)
-        else:
-            logger.info("Соединение закрыто нормально")
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, max_delay)
-        finally:
-            logger.info("Попытка переподключения...")
+# Константы
+CLIENT_ID = '347189'  # Замените на ваш CLIENT_ID, если требуется
+CLIENT_SECRET = '3ujtmboqehae8ubemo5n'  # Замените на ваш CLIENT_SECRET, если требуется
+REVERB_ENDPOINT = 'ws://127.0.0.1'  # Замените на ваш эндпоинт Reverb
+REVERB_PORT = 9000  # Замените на ваш эндпоинт Reverb
+APP_KEY = 'rx2qs9ivfr2uioolb2w2'  # Замените на ваш APP_KEY для Pusher
 
 
-async def forward_messages(ws_from, ws_to, direction):
-    try:
-        async for message in ws_from:
-            logger.debug(f"Пересылка сообщения ({direction}): {message}")
-            await ws_to.send(message)
-    except Exception as e:
-        logger.warning(f"Ошибка при пересылке сообщений ({direction}): {e}")
+# Функция для запуска прокси
+def start_proxy(moonraker_url, channel_name):
+    # Создаем asyncio loop для работы в отдельном потоке
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # Запускаем задачи
+    tasks = [
+        moonraker_to_reverb(loop, moonraker_url, channel_name),
+        reverb_to_moonraker(loop, moonraker_url, channel_name)
+    ]
+    loop.run_until_complete(asyncio.gather(*tasks))
 
 
-async def keep_alive(ws, name):
-    try:
+# Пересылка сообщений из Moonraker в Reverb
+async def moonraker_to_reverb(loop, moonraker_url, channel_name):
+    async with websockets.connect(moonraker_url) as moonraker_ws:
+        logger.info(f"Подключено к Moonraker на {moonraker_url}")
+
+        # Инициализируем Pusher-клиент
+        reverb_pusher = pusherclient.Pusher(
+            key=APP_KEY,
+            cluster='mt1',
+            secure=False,
+            ws_host=REVERB_ENDPOINT,  # Замените на ваш хост Reverb
+            ws_port=REVERB_PORT,  # Замените на ваш порт Reverb
+            daemon=True,
+            reconnect_interval=5
+        )
+
+        # Функция обратного вызова при установлении соединения
+        def connect_handler(data):
+            logger.info("Соединение с Reverb установлено (Moonraker to Reverb)")
+            # Подписка на канал не требуется для отправки сообщений
+
+        reverb_pusher.connection.bind('pusher:connection_established', connect_handler)
+        reverb_pusher.connect()
+
+        # Ждем установления соединения
+        while not reverb_pusher.connection.connected:
+            await asyncio.sleep(0.1)
+
         while True:
-            await ws.ping()
-            logger.debug(f"Отправлен пинг на {name} вебсокет")
-            await asyncio.sleep(30)  # Отправляем пинг каждые 30 секунд
-    except Exception as e:
-        logger.warning(f"Потеряно соединение с {name} вебсокетом: {e}")
+            try:
+                message = await moonraker_ws.recv()
+                logger.debug(f"Получено сообщение от Moonraker: {message}")
+
+                # Отправляем сообщение в публичный канал Reverb
+                channel = reverb_pusher[channel_name]
+                channel.trigger('client-event', message)
+            except websockets.ConnectionClosed:
+                logger.warning("Соединение с Moonraker закрыто")
+                break
+            except Exception as e:
+                logger.error(f"Ошибка при пересылке сообщения в Reverb: {e}")
 
 
-def start():
-    if len(sys.argv) != 4 or sys.argv[1] != 'start':
-        print("Использование: myfabric start <local_url> <remote_url>")
+# Пересылка сообщений из Reverb в Moonraker
+async def reverb_to_moonraker(loop, moonraker_url, channel_name):
+    async with websockets.connect(moonraker_url) as moonraker_ws:
+        logger.info(f"Подключено к Moonraker на {moonraker_url}")
+
+        # Инициализируем Pusher-клиент
+        reverb_pusher = pusherclient.Pusher(
+            key=APP_KEY,
+            cluster='mt1',
+            secure=False,
+            ws_host=REVERB_ENDPOINT,  # Замените на ваш хост Reverb
+            ws_port=REVERB_PORT,  # Замените на ваш порт Reverb
+            daemon=True,
+            reconnect_interval=5
+        )
+
+        # Функция обратного вызова при установлении соединения
+        def connect_handler(data):
+            logger.info("Соединение с Reverb установлено (Reverb to Moonraker)")
+            # Подписываемся на публичный канал
+            channel = reverb_pusher.subscribe(channel_name)
+            channel.bind('client-event', reverb_message_handler)
+
+        # Обработчик сообщений из Reverb
+        def reverb_message_handler(message):
+            logger.debug(f"Получено сообщение от Reverb: {message}")
+            asyncio.run_coroutine_threadsafe(
+                moonraker_ws.send(message),
+                loop
+            )
+
+        reverb_pusher.connection.bind('pusher:connection_established', connect_handler)
+        reverb_pusher.connect()
+
+        # Ждем установления соединения
+        while not reverb_pusher.connection.connected:
+            await asyncio.sleep(0.1)
+
+        # Поддерживаем соединение
+        while True:
+            await asyncio.sleep(1)
+
+
+# Точка входа в программу
+def main():
+    if len(sys.argv) != 3:
+        print("Использование: myfabric-connect <moonraker_url> <channel_name>")
         sys.exit(1)
-    local_url = sys.argv[2]
-    remote_url = sys.argv[3]
-    try:
-        asyncio.run(proxy(local_url, remote_url))
-    except KeyboardInterrupt:
-        logger.info("Программа остановлена пользователем")
-    except Exception as e:
-        logger.error(f"Непредвиденная ошибка: {e}", exc_info=True)
+
+    moonraker_url = sys.argv[1]
+    channel_name = sys.argv[2]
+
+    # Запускаем прокси в отдельном потоке
+    proxy_thread = threading.Thread(target=start_proxy, args=(moonraker_url, channel_name))
+    proxy_thread.start()
+
+    # Поддерживаем основной поток активным
+    while True:
+        time.sleep(1)
 
 
 if __name__ == '__main__':
-    start()
+    main()
