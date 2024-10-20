@@ -1,10 +1,10 @@
 # myfabric/main.py
 
-import json
 import sys
 import asyncio
 import websockets
 import logging
+from logging.handlers import RotatingFileHandler
 import requests
 from pysher import Pusher
 import argparse
@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--log-level', default='INFO',
                         help='Уровень логирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
     parser.add_argument('moonraker_url', help='URL Moonraker WebSocket (например, ws://localhost:7125/websocket)')
-    parser.add_argument('channel_name', help='Название канала для Reverb (например, private-channel)')
+    parser.add_argument('printer_key', help='Ключ принтера в MyFabric (хэш-строка)')
     parser.add_argument('credentials', help='Учетные данные в формате login:password')
 
     args = parser.parse_args()
@@ -33,7 +33,7 @@ def main():
     logger.setLevel(log_level)
 
     # Создаем обработчик логов с ротацией
-    handler = logging.handlers.RotatingFileHandler(
+    handler = RotatingFileHandler(
         args.log_file, maxBytes=10 * 1024 * 1024, backupCount=5)
     formatter = logging.Formatter(
         '%(asctime)s [%(levelname)s] %(name)s: %(message)s')
@@ -49,7 +49,7 @@ def main():
 
     # Запуск основного цикла
     try:
-        asyncio.run(start_proxy(args.moonraker_url, args.channel_name, login, password))
+        asyncio.run(start_proxy(args.moonraker_url, f'private-printers.{args.printer_key}', login, password))
     except KeyboardInterrupt:
         logger.info("Остановка программы по запросу пользователя")
     except Exception as e:
