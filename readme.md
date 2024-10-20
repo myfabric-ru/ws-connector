@@ -4,7 +4,7 @@
 
 ## Установка
 
-Текущая актуальная версия программы `0.1.28` работает с `Python 3`.
+Текущая актуальная версия программы `0.1.29` работает с `Python 3`.
 
 ```bash
 # Устанавливаем пакет на сервер с Moonraker
@@ -18,9 +18,9 @@ pip install myfabric-connector
 Запускаем программу, указав в качестве параметров URL WebSocket Moonraker, идентификатор принтера в системе MyFabric (channel_name), а также логин и пароль от учетной записи MyFabric в формате `email:password`.
 
 ```shell
-# myfabric-connect [--log-file LOG_FILE] [--log-level LOG_LEVEL] <moonraker_url> <channel_name> <login:password>
+# myfabric-connect [--log-file LOG_FILE] [--log-level LOG_LEVEL] <moonraker_url> <channel_name> <login> <password>
 
-myfabric-connect ws://localhost:7125/websocket my-printer-id user@example.com:my_password
+myfabric-connect ws://localhost:7125/websocket my-printer-id user@example.com my_password
 ```
 
 **Примечание:** В URL Moonraker используйте `localhost` или IP-адрес сервера Moonraker, вместо `0.0.0.0`, так как `0.0.0.0` не является корректным адресом для подключения клиента.
@@ -54,9 +54,9 @@ myfabric-connect --version
 
    [Service]
    Type=simple
-   User=klipper  # Замените на имя пользователя, от которого будет запускаться служба
+   User=klipper
    EnvironmentFile=/etc/myfabric/myfabric.conf
-   ExecStart=/usr/local/bin/myfabric-connect $MOONRAKER_URL $CHANNEL_NAME $CREDENTIALS --log-file $LOG_FILE --log-level $LOG_LEVEL
+   ExecStart=/usr/local/bin/myfabric-connect $MOONRAKER_URL $CHANNEL_NAME $LOGIN $PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
    Restart=on-failure
    RestartSec=5s
    StandardOutput=journal
@@ -79,7 +79,8 @@ myfabric-connect --version
    ```bash
    MOONRAKER_URL=ws://localhost:7125/websocket
    CHANNEL_NAME=my-printer-id
-   CREDENTIALS=user@example.com:my_password
+   LOGIN=user@example.com
+   PASSWORD=my_password
    LOG_FILE=/var/log/myfabric/myfabric.log
    LOG_LEVEL=INFO
    ```

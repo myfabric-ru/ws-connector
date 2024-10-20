@@ -23,7 +23,8 @@ def main():
                         help='Уровень логирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
     parser.add_argument('moonraker_url', help='URL Moonraker WebSocket (например, ws://localhost:7125/websocket)')
     parser.add_argument('printer_key', help='Ключ принтера в MyFabric (хэш-строка)')
-    parser.add_argument('credentials', help='Учетные данные в формате login:password')
+    parser.add_argument('login', help='E-mail от учетной записи MyFabric')
+    parser.add_argument('password', help='Пароль от учётной записи MyFabric')
 
     args = parser.parse_args()
 
@@ -40,16 +41,9 @@ def main():
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    # Разбор учетных данных
-    try:
-        login, password = args.credentials.split(":")
-    except ValueError:
-        logger.error("Учетные данные должны быть в формате login:password")
-        sys.exit(1)
-
     # Запуск основного цикла
     try:
-        asyncio.run(start_proxy(args.moonraker_url, f'private-printers.{args.printer_key}', login, password))
+        asyncio.run(start_proxy(args.moonraker_url, f'private-printers.{args.printer_key}', args.login, args.password))
     except KeyboardInterrupt:
         logger.info("Остановка программы по запросу пользователя")
     except Exception as e:
