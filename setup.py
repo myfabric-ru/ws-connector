@@ -4,11 +4,12 @@ from setuptools import setup, find_packages
 
 setup(
     name='myfabric-connector',
-    version='0.1.9',
+    version='0.1.25',
     packages=find_packages(),
     install_requires=[
         'websockets',
-        'pusherclient',
+        'requests',
+        'pysher',
     ],
     entry_points={
         'console_scripts': [
