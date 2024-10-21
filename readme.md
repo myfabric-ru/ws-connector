@@ -41,7 +41,7 @@ myfabric-connect --version
 
 Чтобы процесс автоматически запускался при старте системы и работал в фоновом режиме, рекомендуется настроить службу systemd.
 
-### Настройка службы systemd
+### Настройка службы systemd (в случае если на 1 хосте подключен 1 принтер)
 
 1. **Создайте файл службы**
 
@@ -116,6 +116,85 @@ myfabric-connect --version
    # Проверьте статус службы
    sudo systemctl status myfabric.service
    ```
+
+### Настройка службы systemd (в случае если на 1 хосте подключено более 1 принтера)
+
+1. **Создайте файл службы**
+
+   Создайте файл `myfabric_1.service` в каталоге `/etc/systemd/system/`:
+
+   ```ini
+   [Unit]
+   Description=MyFabric Connector Service
+   After=network.target
+
+   [Service]
+   Type=simple
+   User=klipper
+   EnvironmentFile=/etc/myfabric/myfabric_1.conf
+   ExecStart=/usr/local/bin/myfabric-connect $MOONRAKER_URL $CHANNEL_NAME $LOGIN $PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
+   Restart=on-failure
+   RestartSec=5s
+   StandardOutput=journal
+   StandardError=journal
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+   **Примечания:**
+
+   - Убедитесь, что путь к исполняемому файлу `myfabric-connect` корректен. Вы можете определить путь командой `which myfabric-connect`.
+   - Замените `User` на имя пользователя, от которого должен запускаться процесс (например, `klipper`).
+   - Использование файла окружения позволяет хранить конфиденциальные данные (например, пароли) отдельно от файла службы.
+
+2. **Создайте файл окружения**
+
+   **Обратите внимание, что в случае наличия более одного принтера, подключенного к одноплатнику, меняется только порт подключения**
+   Создайте файл `/etc/myfabric/myfabric_1.conf` и добавьте в него следующие строки:
+
+   ```bash
+   MOONRAKER_URL=ws://localhost:7125/websocket
+   CHANNEL_NAME=my-printer-id
+   LOGIN=user@example.com
+   PASSWORD=my_password
+   LOG_FILE=/var/log/myfabric/myfabric_1.log
+   LOG_LEVEL=INFO
+   ```
+
+   **Установите права доступа к файлу:**
+
+   ```bash
+   sudo chown root:root /etc/myfabric/myfabric_1.conf
+   sudo chmod 600 /etc/myfabric/myfabric_1.conf
+   ```
+
+3. **Создайте каталог для логов**
+
+   ```bash
+   sudo mkdir -p /var/log/myfabric
+   sudo chown klipper:klipper /var/log/myfabric
+   ```
+
+   Замените `klipper:klipper` на пользователя и группу, от имени которых запускается служба.
+
+4. **Запустите и включите службу**
+
+   ```bash
+   # Перезагрузите конфигурацию systemd
+   sudo systemctl daemon-reload
+
+   # Включите службу для автоматического запуска при старте системы
+   sudo systemctl enable myfabric_1.service
+
+   # Запустите службу
+   sudo systemctl start myfabric_1.service
+
+   # Проверьте статус службы
+   sudo systemctl status myfabric_1.service
+   ```
+Для последующего принтера, повторите действия, меняя _1 (порядковый номер) и порт на котором находится экземпляр moonraker (обычно это порты по порядку 7125, 7126 и тд)
+
 
 ## Логирование работы
 
