@@ -143,7 +143,7 @@ async def reverb_to_moonraker(moonraker_url, channel_name, bearer):
                 # Подписываемся на приватный канал
                 ws_auth_token = auth_ws(bearer, channel_name, reverb_pusher.connection.socket_id)
                 channel = reverb_pusher.subscribe(channel_name, ws_auth_token)
-                channel.bind('client-event', reverb_message_handler)
+                channel.bind('moonraker-request', reverb_message_handler)
 
             # Обработчик сообщений из Reverb
             def reverb_message_handler(message):

@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: myfabric-connector
-Version: 0.1.29
+Version: 0.1.30
 Summary: Программа для взаимодействия 3D принтеров и  CRM MyFabric
 Home-page: https://github.com/myfabric-ru/ws-connector
 Author: Khonik
@@ -18,7 +18,7 @@ Requires-Dist: pysher
 
 ## Установка
 
-Текущая актуальная версия программы `0.1.29` работает с `Python 3`.
+Текущая актуальная версия программы `0.1.30` работает с `Python 3`.
 
 ```bash
 # Устанавливаем пакет на сервер с Moonraker
@@ -68,7 +68,7 @@ myfabric-connect --version
 
    [Service]
    Type=simple
-   User=klipper  # Замените на имя пользователя, от которого будет запускаться служба
+   User=klipper
    EnvironmentFile=/etc/myfabric/myfabric.conf
    ExecStart=/usr/local/bin/myfabric-connect $MOONRAKER_URL $CHANNEL_NAME $LOGIN $PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
    Restart=on-failure
