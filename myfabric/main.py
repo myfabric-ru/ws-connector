@@ -10,7 +10,7 @@ import argparse
 from .__version__ import __version__
 import time
 import requests
-from .install_runner import run_install
+from .install_runner import run_install, run_uninstall
 
 REVERB_ENDPOINT = "app.myfabric.ru"
 APP_KEY = "3ujtmboqehae8ubemo5n"
@@ -36,6 +36,8 @@ def main():
 
     # Подкоманда install
     install_parser = subparsers.add_parser('install', help='Установка необходимых компонентов')
+    uninstall_parser = subparsers.add_parser('uninstall', help='Удаление службы')
+    uninstall_parser.add_argument('printer_key', help='Ключ принтера в MyFabric (хэш-строка)')
 
     args = parser.parse_args()
 
@@ -44,6 +46,8 @@ def main():
         start_program(args)
     elif args.command == "install":
         run_install()
+    elif args.command == "uninstall":
+        run_uninstall(args.printer_key)
     else:
         parser.print_help()
 

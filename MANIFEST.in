@@ -1,1 +1,2 @@
 include myfabric/install.sh
+include myfabric/uninstall.sh

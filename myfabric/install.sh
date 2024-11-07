@@ -76,14 +76,16 @@ declare -a printer_keys
 declare -a moonraker_urls
 
 while true; do
-    read -p "Введите printer key (оставьте пустым для завершения ввода): " printer_key
-    if [[ -z "$printer_key" ]]; then
-        break
-    fi
+    read -p "Введите printer key: " printer_key
     read -p "Введите URL Moonraker для принтера $printer_key (например, localhost:7125): " moonraker_url
 
     printer_keys+=("$printer_key")
     moonraker_urls+=("$moonraker_url")
+
+    read -p "Добавить еще принтер? (Y/N): " add_more
+    if [[ "$add_more" =~ ^(Нет|нет|n|N)$ ]]; then
+        break
+    fi
 done
 
 # Создание каталога для логов

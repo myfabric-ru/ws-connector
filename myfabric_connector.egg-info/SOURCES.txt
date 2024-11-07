@@ -6,6 +6,7 @@ myfabric/__version__.py
 myfabric/install.sh
 myfabric/install_runner.py
 myfabric/main.py
+myfabric/uninstall.sh
 myfabric_connector.egg-info/PKG-INFO
 myfabric_connector.egg-info/SOURCES.txt
 myfabric_connector.egg-info/dependency_links.txt
