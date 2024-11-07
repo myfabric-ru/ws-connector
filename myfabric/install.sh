@@ -35,8 +35,6 @@ function setup_service {
     echo "PRINTER_KEY=$printer_key" | sudo tee -a $env_file
     echo "MYFABRIC_LOGIN=$myfabric_email" | sudo tee -a $env_file
     echo "MYFABRIC_PASSWORD=$myfabric_password" | sudo tee -a $env_file
-    echo "MOONRAKER_LOGIN=$moonraker_login" | sudo tee -a $env_file
-    echo "MOONRAKER_PASSWORD=$moonraker_password" | sudo tee -a $env_file
     echo "LOG_FILE=/var/log/myfabric/myfabric_$printer_key.log" | sudo tee -a $env_file
     echo "LOG_LEVEL=INFO" | sudo tee -a $env_file
     sudo chmod 600 $env_file
@@ -52,7 +50,7 @@ After=network.target
 Type=simple
 User=$CURRENT_USER
 EnvironmentFile=$env_file
-ExecStart=$CONNECT_PATH start \$MOONRAKER_URL \$MOONRAKER_LOGIN \$MOONRAKER_PASSWORD \$PRINTER_KEY \$MYFABRIC_LOGIN \$MYFABRIC_PASSWORD --log-file \$LOG_FILE --log-level \$LOG_LEVEL
+ExecStart=$CONNECT_PATH start \$MOONRAKER_URL \$PRINTER_KEY \$MYFABRIC_LOGIN \$MYFABRIC_PASSWORD --log-file \$LOG_FILE --log-level \$LOG_LEVEL
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
@@ -69,9 +67,6 @@ WantedBy=multi-user.target" | sudo tee $service_file
 echo "Сбор информации для установки..."
 
 # Запрос общих данных
-read -p "Введите общий логин Moonraker: " moonraker_login
-read -sp "Введите общий пароль Moonraker: " moonraker_password
-echo
 read -p "Введите email для MyFabric: " myfabric_email
 read -sp "Введите пароль для MyFabric: " myfabric_password
 echo
@@ -85,7 +80,7 @@ while true; do
     if [[ -z "$printer_key" ]]; then
         break
     fi
-    read -p "Введите URL Moonraker для принтера $printer_key: " moonraker_url
+    read -p "Введите URL Moonraker для принтера $printer_key (например, localhost:7125): " moonraker_url
 
     printer_keys+=("$printer_key")
     moonraker_urls+=("$moonraker_url")

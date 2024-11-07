@@ -30,8 +30,6 @@ def main():
     start_parser.add_argument('--log-level', default='INFO',
                               help='Уровень логирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
     start_parser.add_argument('moonraker_url', help='URL Moonraker WebSocket (например, localhost:7125)')
-    start_parser.add_argument('moonraker_login', help='Логин от moonraker')
-    start_parser.add_argument('moonraker_password', help='Пароль от moonraker')
     start_parser.add_argument('printer_key', help='Ключ принтера в MyFabric (хэш-строка)')
     start_parser.add_argument('myfabric_login', help='E-mail от учетной записи MyFabric')
     start_parser.add_argument('myfabric_password', help='Пароль от учётной записи MyFabric')
@@ -66,9 +64,7 @@ def start_program(args):
 
     # Запуск основного цикла
     try:
-        asyncio.run(start_proxy(args.moonraker_url, args.printer_key, args.myfabric_login, args.myfabric_password,
-                                args.moonraker_login,
-                                args.moonraker_password))
+        asyncio.run(start_proxy(args.moonraker_url, args.printer_key, args.myfabric_login, args.myfabric_password))
     except KeyboardInterrupt:
         logger.info("Остановка программы по запросу пользователя")
     except Exception as e:
@@ -77,11 +73,11 @@ def start_program(args):
 
 
 # Функция для запуска прокси
-async def start_proxy(moonraker_url, printer_key, login, password, moonraker_login, moonraker_password):
+async def start_proxy(moonraker_url, printer_key, login, password):
     channel_name = f'private-printers.{printer_key}'
     bearer = login_fabric(login, password)
 
-    moonraker_api_key = get_moonraker_token(moonraker_url, moonraker_login, moonraker_password)
+    moonraker_api_key = get_moonraker_token(moonraker_url)
     moonraker_ws = f"ws://{moonraker_url}/websocket?token={moonraker_api_key}"
 
     await proxy_moonraker_reverb(moonraker_ws, channel_name, printer_key, bearer)
@@ -126,19 +122,8 @@ def auth_reverb(bearer, channel_name, socket_id):
     return auth_key
 
 
-def get_moonraker_token(moonraker_url, username, password):
-    response = requests.post(f"http://{moonraker_url}/access/login", json={
-        'username': username,
-        'password': password,
-        "source": "moonraker"
-    })
-    if response.status_code != 200:
-        raise Exception(f"Failed to obtain Moonraker token: {response.status_code} {response.text}")
-    data = response.json()
-    bearer = data['result']['token']
-    response = requests.get(f"http://{moonraker_url}/access/oneshot_token", headers={
-        "Authorization": f'Bearer {bearer}'
-    })
+def get_moonraker_token(moonraker_url):
+    response = requests.get(f"http://{moonraker_url}/access/oneshot_token")
     data = response.json()
     return data.get("result")
 

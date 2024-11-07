@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: myfabric-connector
-Version: 0.1.71
+Version: 0.1.72
 Summary: Программа для взаимодействия 3D принтеров и  CRM MyFabric
 Home-page: https://github.com/myfabric-ru/ws-connector
 Author: Khonik
@@ -17,31 +17,54 @@ Requires-Dist: pysher
 
 Программа для проксирования данных с WebSocket Moonraker в CRM MyFabric.
 
-## Установка
+## Быстрая установка
 
-Текущая актуальная версия программы `0.1.70` работает с `Python 3`.
+### Установка пакета-коннектора
 
+Текущая актуальная версия программы `0.1.71` работает с `Python ^3.6`.
+
+Устанавливаем `pip` (менеджер пакетов), если его нет в системе
+```shell
+sudo apt-get install python3-pip
+```
+Устанавливаем пакет на сервер с Moonraker
 ```bash
-# Устанавливаем пакет на сервер с Moonraker
 pip install myfabric-connector
+# или
+pip3 install myfabric-connector
 ```
 
-## Команды
-
-### Установка
+### Быстрая установка конфигурационных файлов
+Выпоните команду, инициализирующую установку
 ```shell
  $HOME/.local/bin/myfabric-connector install
 ```
+В интерактивном режиме ответьте на следующие вопросы:
+
+- Логин от Moonraker
+- Пароль от Moonraker
+- Логин (E-mail) от MyFabric
+- Пароль от MyFabric
+
+Далее, система предложит заполнить информацию о принтерах. Продолжайте вводить в интерактивном режиме следующую информацию:
+
+- Уникальный идентификатор принтера в системе MyFabric (хэш-строка. пример: 0d6d5fde-078b-4c88-b67f-709a6f210068)
+- Локальный путь до moonraker. Например, `localhost:7125`
+
+После добавления всех принтеров система автоматически создаст все конфигурационные файлы.
+
+
+## Ручная установка
 
 ### Запуск проксирования
 
 Запускаем программу, указав в качестве параметров URL WebSocket Moonraker, идентификатор принтера в системе MyFabric (
-printer_key), а также логин и пароль от учетной записи MyFabric и Moonraker`.
+printer_key), а также логин и пароль от учетной записи MyFabric`.
 
 ```shell
-# myfabric-connector [--log-file LOG_FILE] [--log-level LOG_LEVEL] <moonraker_url> <moonraker_login> <moonraker_password> <printer_key> <myfabric_email> <myfabric_password> 
+# myfabric-connector [--log-file LOG_FILE] [--log-level LOG_LEVEL] <moonraker_url> <printer_key> <myfabric_email> <myfabric_password> 
 
-myfabric-connector start localhost:7125 moonraker_login moonraker_password my-printer-key user@example.com my_password
+myfabric-connector start localhost:7125 my-printer-key user@example.com my_password
 ```
 
 **Примечание:** В URL Moonraker используйте `localhost` или IP-адрес сервера Moonraker, вместо `0.0.0.0`, так
@@ -78,9 +101,9 @@ systemd.
 
    [Service]
    Type=simple
-   User=klipper
+   User= # здесь укажите имя пользователя linux
    EnvironmentFile=/etc/myfabric/myfabric.conf
-   ExecStart=/usr/local/bin/myfabric-connector start $MOONRAKER_URL $MOONRAKER_LOGIN $MOONRAKER_PASSWORD $PRINTER_KEY $MYFABRIC_LOGIN $MYFABRIC_PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
+   ExecStart=/usr/local/bin/myfabric-connector start $MOONRAKER_URL $PRINTER_KEY $MYFABRIC_LOGIN $MYFABRIC_PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
    Restart=on-failure
    RestartSec=5s
    StandardOutput=journal
@@ -107,8 +130,6 @@ systemd.
    PRINTER_KEY=my-printer-key
    MYFABRIC_LOGIN=user@example.com
    MYFABRIC_PASSWORD=my_password
-   MOONRAKER_LOGIN=user
-   MOONRAKER_PASSWORD=password
    LOG_FILE=/var/log/myfabric/myfabric.log
    LOG_LEVEL=INFO
    ```
@@ -158,9 +179,9 @@ systemd.
 
    [Service]
    Type=simple
-   User=klipper
+   User= # Укажите тут имя пользователя linux
    EnvironmentFile=/etc/myfabric/myfabric_1.conf
-   ExecStart=/usr/local/bin/myfabric-connector start $MOONRAKER_URL $MOONRAKER_LOGIN $MOONRAKER_PASSWORD $PRINTER_KEY $MYFABRIC_LOGIN $MYFABRIC_PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
+   ExecStart=/usr/local/bin/myfabric-connector start $MOONRAKER_URL $PRINTER_KEY $MYFABRIC_LOGIN $MYFABRIC_PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
    Restart=on-failure
    RestartSec=5s
    StandardOutput=journal
@@ -188,8 +209,6 @@ systemd.
    MOONRAKER_URL=localhost:7125
    MYFABRIC_LOGIN=user@example.com
    MYFABRIC_PASSWORD=my_password
-   MOONRAKER_LOGIN=user
-   MOONRAKER_PASSWORD=password
    LOG_FILE=/var/log/myfabric/myfabric_1.log
    LOG_LEVEL=INFO
    ```
@@ -278,7 +297,7 @@ myfabric-connector: command not found
 - Или используйте полный путь к исполняемому файлу:
 
   ```shell
-  /home/klipper/.local/bin/myfabric-connector start localhost:7126 moonraker_login moonraker_password my-printer-key user@example.com my_password
+  /home/klipper/.local/bin/myfabric-connector start localhost:7126 my-printer-key user@example.com my_password
   ```
 
 ### Проблемы с правами доступа
