@@ -4,7 +4,7 @@
 
 ## Установка
 
-Текущая актуальная версия программы `0.1.30` работает с `Python 3`.
+Текущая актуальная версия программы `0.1.58` работает с `Python 3`.
 
 ```bash
 # Устанавливаем пакет на сервер с Moonraker
@@ -15,21 +15,24 @@ pip install myfabric-connector
 
 ### Запуск проксирования
 
-Запускаем программу, указав в качестве параметров URL WebSocket Moonraker, идентификатор принтера в системе MyFabric (channel_name), а также логин и пароль от учетной записи MyFabric в формате `email:password`.
+Запускаем программу, указав в качестве параметров URL WebSocket Moonraker, идентификатор принтера в системе MyFabric (
+printer_key), а также логин и пароль от учетной записи MyFabric и Moonraker`.
 
 ```shell
-# myfabric-connect [--log-file LOG_FILE] [--log-level LOG_LEVEL] <moonraker_url> <channel_name> <login> <password>
+# myfabric-connect [--log-file LOG_FILE] [--log-level LOG_LEVEL] <moonraker_url> <moonraker_login> <moonraker_password> <printer_key> <myfabric_email> <myfabric_password> 
 
-myfabric-connect ws://localhost:7125/websocket my-printer-id user@example.com my_password
+myfabric-connect localhost:7125 moonraker_login moonraker_password my-printer-id user@example.com my_password
 ```
 
-**Примечание:** В URL Moonraker используйте `localhost` или IP-адрес сервера Moonraker, вместо `0.0.0.0`, так как `0.0.0.0` не является корректным адресом для подключения клиента.
+**Примечание:** В URL Moonraker используйте `localhost` или IP-адрес сервера Moonraker, вместо `0.0.0.0`, так
+как `0.0.0.0` не является корректным адресом для подключения клиента.
 
 Дополнительные опции:
 
 - `--log-file`: Указывает путь к файлу логов. По умолчанию: `/var/log/myfabric/myfabric.log`.
-  
-- `--log-level`: Указывает уровень логирования. Возможные значения: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. По умолчанию: `INFO`.
+
+- `--log-level`: Указывает уровень логирования. Возможные значения: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. По
+  умолчанию: `INFO`.
 
 ### Получение версии пакета
 
@@ -39,7 +42,8 @@ myfabric-connect --version
 
 ## Поддержание процесса
 
-Чтобы процесс автоматически запускался при старте системы и работал в фоновом режиме, рекомендуется настроить службу systemd.
+Чтобы процесс автоматически запускался при старте системы и работал в фоновом режиме, рекомендуется настроить службу
+systemd.
 
 ### Настройка службы systemd (в случае если на 1 хосте подключен 1 принтер)
 
@@ -56,7 +60,7 @@ myfabric-connect --version
    Type=simple
    User=klipper
    EnvironmentFile=/etc/myfabric/myfabric.conf
-   ExecStart=/usr/local/bin/myfabric-connect $MOONRAKER_URL $CHANNEL_NAME $LOGIN $PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
+   ExecStart=/usr/local/bin/myfabric-connect $MOONRAKER_URL $MOONRAKER_LOGIN $MOONRAKER_PASSWORD $PRINTER_KEY $MYFABRIC_LOGIN $MYFABRIC_PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
    Restart=on-failure
    RestartSec=5s
    StandardOutput=journal
@@ -68,19 +72,23 @@ myfabric-connect --version
 
    **Примечания:**
 
-   - Убедитесь, что путь к исполняемому файлу `myfabric-connect` корректен. Вы можете определить путь командой `which myfabric-connect`.
-   - Замените `User` на имя пользователя, от которого должен запускаться процесс (например, `klipper`).
-   - Использование файла окружения позволяет хранить конфиденциальные данные (например, пароли) отдельно от файла службы.
+    - Убедитесь, что путь к исполняемому файлу `myfabric-connect` корректен. Вы можете определить путь
+      командой `which myfabric-connect`.
+    - Замените `User` на имя пользователя, от которого должен запускаться процесс (например, `klipper`).
+    - Использование файла окружения позволяет хранить конфиденциальные данные (например, пароли) отдельно от файла
+      службы.
 
 2. **Создайте файл окружения**
 
    Создайте файл `/etc/myfabric/myfabric.conf` и добавьте в него следующие строки:
 
    ```bash
-   MOONRAKER_URL=ws://localhost:7125/websocket
-   CHANNEL_NAME=my-printer-id
-   LOGIN=user@example.com
-   PASSWORD=my_password
+   MOONRAKER_URL=localhost:7125
+   PRINTER_KEY=my-printer-key
+   MYFABRIC_LOGIN=user@example.com
+   MYFABRIC_PASSWORD=my_password
+   MOONRAKER_LOGIN=user
+   MOONRAKER_PASSWORD=password
    LOG_FILE=/var/log/myfabric/myfabric.log
    LOG_LEVEL=INFO
    ```
@@ -132,7 +140,7 @@ myfabric-connect --version
    Type=simple
    User=klipper
    EnvironmentFile=/etc/myfabric/myfabric_1.conf
-   ExecStart=/usr/local/bin/myfabric-connect $MOONRAKER_URL $CHANNEL_NAME $LOGIN $PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
+   ExecStart=/usr/local/bin/myfabric-connect $MOONRAKER_URL $MOONRAKER_LOGIN $MOONRAKER_PASSWORD $PRINTER_KEY $MYFABRIC_LOGIN $MYFABRIC_PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
    Restart=on-failure
    RestartSec=5s
    StandardOutput=journal
@@ -144,20 +152,24 @@ myfabric-connect --version
 
    **Примечания:**
 
-   - Убедитесь, что путь к исполняемому файлу `myfabric-connect` корректен. Вы можете определить путь командой `which myfabric-connect`.
-   - Замените `User` на имя пользователя, от которого должен запускаться процесс (например, `klipper`).
-   - Использование файла окружения позволяет хранить конфиденциальные данные (например, пароли) отдельно от файла службы.
+    - Убедитесь, что путь к исполняемому файлу `myfabric-connect` корректен. Вы можете определить путь
+      командой `which myfabric-connect`.
+    - Замените `User` на имя пользователя, от которого должен запускаться процесс (например, `klipper`).
+    - Использование файла окружения позволяет хранить конфиденциальные данные (например, пароли) отдельно от файла
+      службы.
 
 2. **Создайте файл окружения**
 
-   **Обратите внимание, что в случае наличия более одного принтера, подключенного к одноплатнику, меняется только порт подключения**
+   **Обратите внимание, что в случае наличия более одного принтера, подключенного к одноплатнику, меняется только порт
+   подключения**
    Создайте файл `/etc/myfabric/myfabric_1.conf` и добавьте в него следующие строки:
 
    ```bash
-   MOONRAKER_URL=ws://localhost:7125/websocket
-   CHANNEL_NAME=my-printer-id
-   LOGIN=user@example.com
-   PASSWORD=my_password
+   MOONRAKER_URL=localhost:7125
+   MYFABRIC_LOGIN=user@example.com
+   MYFABRIC_PASSWORD=my_password
+   MOONRAKER_LOGIN=user
+   MOONRAKER_PASSWORD=password
    LOG_FILE=/var/log/myfabric/myfabric_1.log
    LOG_LEVEL=INFO
    ```
@@ -193,8 +205,9 @@ myfabric-connect --version
    # Проверьте статус службы
    sudo systemctl status myfabric_1.service
    ```
-Для последующего принтера, повторите действия, меняя _1 (порядковый номер) и порт на котором находится экземпляр moonraker (обычно это порты по порядку 7125, 7126 и тд)
 
+Для последующего принтера, повторите действия, меняя _1 (порядковый номер) и порт на котором находится экземпляр
+moonraker (обычно это порты по порядку 7125, 7126 и тд)
 
 ## Логирование работы
 
@@ -228,14 +241,15 @@ myfabric-connect: command not found
 **Решение:**
 
 - Убедитесь, что пакет установлен и доступен в `$PATH`.
-  
+
 - Проверьте, где находится исполняемый файл:
 
   ```bash
   which myfabric-connect
   ```
 
-- Если команда не найдена, возможно, необходимо добавить директорию с локальными пакетами Python в переменную окружения `$PATH`:
+- Если команда не найдена, возможно, необходимо добавить директорию с локальными пакетами Python в переменную
+  окружения `$PATH`:
 
   ```bash
   export PATH=$PATH:~/.local/bin
@@ -250,38 +264,38 @@ myfabric-connect: command not found
 ### Проблемы с правами доступа
 
 - **Описание:**
-  
+
   Ошибки, связанные с недостаточными правами доступа к файлам или сетевым портам.
 
 - **Решение:**
 
-  - Убедитесь, что пользователь, от имени которого запускается служба, имеет необходимые права доступа.
-  - Проверьте права на файлы конфигурации и логов.
-  - Если необходимо, настройте соответствующие разрешения с помощью команд `chown` и `chmod`.
+    - Убедитесь, что пользователь, от имени которого запускается служба, имеет необходимые права доступа.
+    - Проверьте права на файлы конфигурации и логов.
+    - Если необходимо, настройте соответствующие разрешения с помощью команд `chown` и `chmod`.
 
 ### Ошибки при подключении к Moonraker
 
 - **Описание:**
-  
+
   Программа не может установить соединение с Moonraker.
 
 - **Решение:**
 
-  - Убедитесь, что Moonraker запущен и доступен по указанному адресу и порту.
-  - Проверьте правильность указания URL Moonraker в файле конфигурации или при запуске программы.
-  - Убедитесь, что нет сетевых ограничений или брандмауэров, блокирующих соединение.
+    - Убедитесь, что Moonraker запущен и доступен по указанному адресу и порту.
+    - Проверьте правильность указания URL Moonraker в файле конфигурации или при запуске программы.
+    - Убедитесь, что нет сетевых ограничений или брандмауэров, блокирующих соединение.
 
 ### Ошибки аутентификации в MyFabric
 
 - **Описание:**
-  
+
   В логах появляются сообщения об ошибке аутентификации при подключении к MyFabric.
 
 - **Решение:**
 
-  - Проверьте правильность указанных учетных данных (email и пароль).
-  - Убедитесь, что учетная запись активна и имеет доступ к необходимым ресурсам.
-  - Попробуйте войти в MyFabric через веб-интерфейс с этими же учетными данными, чтобы убедиться в их корректности.
+    - Проверьте правильность указанных учетных данных (email и пароль).
+    - Убедитесь, что учетная запись активна и имеет доступ к необходимым ресурсам.
+    - Попробуйте войти в MyFabric через веб-интерфейс с этими же учетными данными, чтобы убедиться в их корректности.
 
 ## Обновление программы
 
@@ -301,11 +315,13 @@ myfabric-connect --version
 
 - **Безопасность:**
 
-  - Не храните пароли в открытом виде в файлах или скриптах. Использование файла окружения с ограниченными правами доступа помогает защитить конфиденциальные данные.
+    - Не храните пароли в открытом виде в файлах или скриптах. Использование файла окружения с ограниченными правами
+      доступа помогает защитить конфиденциальные данные.
 
 - **Настройка логирования:**
 
-  - Вы можете изменить уровень детализации логов, указав параметр `--log-level`. Для отладки используйте уровень `DEBUG`.
+    - Вы можете изменить уровень детализации логов, указав параметр `--log-level`. Для отладки используйте
+      уровень `DEBUG`.
 
 - **Остановка службы:**
 
@@ -331,4 +347,5 @@ myfabric-connect --version
 
 ---
 
-**Примечание:** Убедитесь, что все команды и пути соответствуют вашей системе и настройкам. При необходимости, адаптируйте инструкции под вашу конкретную среду.
+**Примечание:** Убедитесь, что все команды и пути соответствуют вашей системе и настройкам. При необходимости,
+адаптируйте инструкции под вашу конкретную среду.
