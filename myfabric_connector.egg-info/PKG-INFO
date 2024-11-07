@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: myfabric-connector
-Version: 0.1.58
+Version: 0.1.59
 Summary: Программа для взаимодействия 3D принтеров и  CRM MyFabric
 Home-page: https://github.com/myfabric-ru/ws-connector
 Author: Khonik
@@ -18,7 +18,7 @@ Requires-Dist: pysher
 
 ## Установка
 
-Текущая актуальная версия программы `0.1.43` работает с `Python 3`.
+Текущая актуальная версия программы `0.1.59` работает с `Python 3`.
 
 ```bash
 # Устанавливаем пакет на сервер с Moonraker

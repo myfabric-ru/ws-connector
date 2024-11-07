@@ -15,6 +15,7 @@ setup(
     entry_points={
         'console_scripts': [
             'myfabric-connect = myfabric.main:main',
+            'myfabric-connect install = myfabric.install_runner:run_install',
         ],
     },
     author='Khonik',
