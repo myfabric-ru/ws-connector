@@ -5,12 +5,12 @@ import asyncio
 import websockets
 import logging
 from logging.handlers import RotatingFileHandler
-import requests
 from pysher import Pusher
 import argparse
 from .__version__ import __version__
 import time
 import requests
+from .install_runner import run_install
 
 REVERB_ENDPOINT = "app.myfabric.ru"
 APP_KEY = "3ujtmboqehae8ubemo5n"
@@ -20,17 +20,37 @@ APP_KEY = "3ujtmboqehae8ubemo5n"
 def main():
     parser = argparse.ArgumentParser(description='MyFabric Connector')
     parser.add_argument('--version', action='version', version=f'MyFabric Connector {__version__}')
-    parser.add_argument('--log-file', default='/var/log/myfabric/myfabric.log', help='Путь к файлу логов')
-    parser.add_argument('--log-level', default='INFO',
-                        help='Уровень логирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
-    parser.add_argument('moonraker_url', help='URL Moonraker WebSocket (например, localhost:7125)')
-    parser.add_argument('moonraker_login', help='Логин от moonraker')
-    parser.add_argument('moonraker_password', help='Пароль от moonraker')
-    parser.add_argument('printer_key', help='Ключ принтера в MyFabric (хэш-строка)')
-    parser.add_argument('myfabric_login', help='E-mail от учетной записи MyFabric')
-    parser.add_argument('myfabric_password', help='Пароль от учётной записи MyFabric')
+
+    # Добавляем подкоманды
+    subparsers = parser.add_subparsers(dest="command", help="Команды")
+
+    # Подкоманда start
+    start_parser = subparsers.add_parser('start', help='Запуск подключения к Moonraker')
+    start_parser.add_argument('--log-file', default='/var/log/myfabric/myfabric.log', help='Путь к файлу логов')
+    start_parser.add_argument('--log-level', default='INFO',
+                              help='Уровень логирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
+    start_parser.add_argument('moonraker_url', help='URL Moonraker WebSocket (например, localhost:7125)')
+    start_parser.add_argument('moonraker_login', help='Логин от moonraker')
+    start_parser.add_argument('moonraker_password', help='Пароль от moonraker')
+    start_parser.add_argument('printer_key', help='Ключ принтера в MyFabric (хэш-строка)')
+    start_parser.add_argument('myfabric_login', help='E-mail от учетной записи MyFabric')
+    start_parser.add_argument('myfabric_password', help='Пароль от учётной записи MyFabric')
+
+    # Подкоманда install
+    install_parser = subparsers.add_parser('install', help='Установка необходимых компонентов')
+
     args = parser.parse_args()
 
+    # Проверяем, какая команда вызвана
+    if args.command == "start":
+        start_program(args)
+    elif args.command == "install":
+        run_install()
+    else:
+        parser.print_help()
+
+
+def start_program(args):
     # Настройка логирования
     log_level = getattr(logging, args.log_level.upper(), logging.INFO)
     logger = logging.getLogger('myfabric')

@@ -1,7 +1,9 @@
+MANIFEST.in
 pyproject.toml
 setup.py
 myfabric/__init__.py
 myfabric/__version__.py
+myfabric/install.sh
 myfabric/install_runner.py
 myfabric/main.py
 myfabric_connector.egg-info/PKG-INFO

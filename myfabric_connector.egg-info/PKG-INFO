@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: myfabric-connector
-Version: 0.1.59
+Version: 0.1.71
 Summary: Программа для взаимодействия 3D принтеров и  CRM MyFabric
 Home-page: https://github.com/myfabric-ru/ws-connector
 Author: Khonik
@@ -14,11 +14,12 @@ Requires-Dist: pysher
 
 # MyFabric
 
+
 Программа для проксирования данных с WebSocket Moonraker в CRM MyFabric.
 
 ## Установка
 
-Текущая актуальная версия программы `0.1.59` работает с `Python 3`.
+Текущая актуальная версия программы `0.1.70` работает с `Python 3`.
 
 ```bash
 # Устанавливаем пакет на сервер с Moonraker
@@ -27,15 +28,20 @@ pip install myfabric-connector
 
 ## Команды
 
+### Установка
+```shell
+ $HOME/.local/bin/myfabric-connector install
+```
+
 ### Запуск проксирования
 
 Запускаем программу, указав в качестве параметров URL WebSocket Moonraker, идентификатор принтера в системе MyFabric (
 printer_key), а также логин и пароль от учетной записи MyFabric и Moonraker`.
 
 ```shell
-# myfabric-connect [--log-file LOG_FILE] [--log-level LOG_LEVEL] <moonraker_url> <moonraker_login> <moonraker_password> <printer_key> <myfabric_email> <myfabric_password> 
+# myfabric-connector [--log-file LOG_FILE] [--log-level LOG_LEVEL] <moonraker_url> <moonraker_login> <moonraker_password> <printer_key> <myfabric_email> <myfabric_password> 
 
-myfabric-connect localhost:7125 moonraker_login moonraker_password my-printer-id user@example.com my_password
+myfabric-connector start localhost:7125 moonraker_login moonraker_password my-printer-key user@example.com my_password
 ```
 
 **Примечание:** В URL Moonraker используйте `localhost` или IP-адрес сервера Moonraker, вместо `0.0.0.0`, так
@@ -51,7 +57,7 @@ myfabric-connect localhost:7125 moonraker_login moonraker_password my-printer-id
 ### Получение версии пакета
 
 ```shell
-myfabric-connect --version
+myfabric-connector --version
 ```
 
 ## Поддержание процесса
@@ -74,7 +80,7 @@ systemd.
    Type=simple
    User=klipper
    EnvironmentFile=/etc/myfabric/myfabric.conf
-   ExecStart=/usr/local/bin/myfabric-connect $MOONRAKER_URL $MOONRAKER_LOGIN $MOONRAKER_PASSWORD $PRINTER_KEY $MYFABRIC_LOGIN $MYFABRIC_PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
+   ExecStart=/usr/local/bin/myfabric-connector start $MOONRAKER_URL $MOONRAKER_LOGIN $MOONRAKER_PASSWORD $PRINTER_KEY $MYFABRIC_LOGIN $MYFABRIC_PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
    Restart=on-failure
    RestartSec=5s
    StandardOutput=journal
@@ -86,8 +92,8 @@ systemd.
 
    **Примечания:**
 
-    - Убедитесь, что путь к исполняемому файлу `myfabric-connect` корректен. Вы можете определить путь
-      командой `which myfabric-connect`.
+    - Убедитесь, что путь к исполняемому файлу `myfabric-connector` корректен. Вы можете определить путь
+      командой `which myfabric-connector`.
     - Замените `User` на имя пользователя, от которого должен запускаться процесс (например, `klipper`).
     - Использование файла окружения позволяет хранить конфиденциальные данные (например, пароли) отдельно от файла
       службы.
@@ -154,7 +160,7 @@ systemd.
    Type=simple
    User=klipper
    EnvironmentFile=/etc/myfabric/myfabric_1.conf
-   ExecStart=/usr/local/bin/myfabric-connect $MOONRAKER_URL $MOONRAKER_LOGIN $MOONRAKER_PASSWORD $PRINTER_KEY $MYFABRIC_LOGIN $MYFABRIC_PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
+   ExecStart=/usr/local/bin/myfabric-connector start $MOONRAKER_URL $MOONRAKER_LOGIN $MOONRAKER_PASSWORD $PRINTER_KEY $MYFABRIC_LOGIN $MYFABRIC_PASSWORD --log-file $LOG_FILE --log-level $LOG_LEVEL
    Restart=on-failure
    RestartSec=5s
    StandardOutput=journal
@@ -166,8 +172,8 @@ systemd.
 
    **Примечания:**
 
-    - Убедитесь, что путь к исполняемому файлу `myfabric-connect` корректен. Вы можете определить путь
-      командой `which myfabric-connect`.
+    - Убедитесь, что путь к исполняемому файлу `myfabric-connector` корректен. Вы можете определить путь
+      командой `which myfabric-connector`.
     - Замените `User` на имя пользователя, от которого должен запускаться процесс (например, `klipper`).
     - Использование файла окружения позволяет хранить конфиденциальные данные (например, пароли) отдельно от файла
       службы.
@@ -248,8 +254,8 @@ moonraker (обычно это порты по порядку 7125, 7126 и тд
 ### Программа не найдена
 
 ```shell
-klipper@orangepi3-lts-11-12:~$ myfabric-connect --version
-myfabric-connect: command not found
+klipper@orangepi3-lts-11-12:~$ myfabric-connector --version
+myfabric-connector: command not found
 ```
 
 **Решение:**
@@ -259,7 +265,7 @@ myfabric-connect: command not found
 - Проверьте, где находится исполняемый файл:
 
   ```bash
-  which myfabric-connect
+  which myfabric-connector
   ```
 
 - Если команда не найдена, возможно, необходимо добавить директорию с локальными пакетами Python в переменную
@@ -272,7 +278,7 @@ myfabric-connect: command not found
 - Или используйте полный путь к исполняемому файлу:
 
   ```shell
-  /home/klipper/.local/bin/myfabric-connect ws://localhost:7125/websocket my-printer-id user@example.com:my_password
+  /home/klipper/.local/bin/myfabric-connector start localhost:7126 moonraker_login moonraker_password my-printer-key user@example.com my_password
   ```
 
 ### Проблемы с правами доступа
@@ -322,7 +328,7 @@ pip install --upgrade myfabric-connector
 **Проверка текущей версии:**
 
 ```bash
-myfabric-connect --version
+myfabric-connector --version
 ```
 
 ## Дополнительная информация

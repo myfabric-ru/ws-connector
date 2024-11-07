@@ -7,6 +7,7 @@ setup(
     name='myfabric-connector',
     version=__version__,
     packages=find_packages(),
+    include_package_data=True,
     install_requires=[
         'websockets',
         'requests',
@@ -14,8 +15,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'myfabric-connect = myfabric.main:main',
-            'myfabric-connect install = myfabric.install_runner:run_install',
+            'myfabric-connector = myfabric.main:main',
         ],
     },
     author='Khonik',

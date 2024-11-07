@@ -1,5 +1,28 @@
 #!/bin/bash
 
+CURRENT_USER=$(whoami)
+
+CONNECT_PATH=$(which myfabric-connector)
+
+# Если не найдено в $PATH, попробуем поискать в стандартных директориях
+if [[ -z "$CONNECT_PATH" ]]; then
+    # Проверяем ~/.local/bin и ~/.local/bin для пользователя
+    if [[ -x "$HOME/.local/bin/myfabric-connector" ]]; then
+        CONNECT_PATH="$HOME/.local/bin/myfabric-connector"
+    elif [[ -x "/usr/local/bin/myfabric-connector" ]]; then
+        CONNECT_PATH="/usr/local/bin/myfabric-connector"
+    else
+        # Запрос пути у пользователя, если не найден
+        read -p "Не удалось найти myfabric-connector в стандартных директориях. Укажите полный путь: " user_path
+        if [[ -x "$user_path" ]]; then
+            CONNECT_PATH="$user_path"
+        else
+            echo "Ошибка: указанный путь ($user_path) не является исполняемым файлом."
+            exit 1
+        fi
+    fi
+fi
+
 # Функция для создания файлов окружения и служб systemd
 function setup_service {
     local printer_key=$1
@@ -27,9 +50,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=klipper
+User=$CURRENT_USER
 EnvironmentFile=$env_file
-ExecStart=/usr/local/bin/myfabric-connect \$MOONRAKER_URL \$MOONRAKER_LOGIN \$MOONRAKER_PASSWORD \$PRINTER_KEY \$MYFABRIC_LOGIN \$MYFABRIC_PASSWORD --log-file \$LOG_FILE --log-level \$LOG_LEVEL
+ExecStart=$CONNECT_PATH start \$MOONRAKER_URL \$MOONRAKER_LOGIN \$MOONRAKER_PASSWORD \$PRINTER_KEY \$MYFABRIC_LOGIN \$MYFABRIC_PASSWORD --log-file \$LOG_FILE --log-level \$LOG_LEVEL
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
@@ -68,12 +91,10 @@ while true; do
     moonraker_urls+=("$moonraker_url")
 done
 
-echo "Установка зависимостей..."
-pip install myfabric-connector
-
 # Создание каталога для логов
 sudo mkdir -p /var/log/myfabric
-sudo chown klipper:klipper /var/log/myfabric
+sudo chown "$CURRENT_USER":"$CURRENT_USER" /var/log/myfabric
+sudo chmod 775 -R /var/log/myfabric
 
 # Настройка служб для каждого принтера
 for i in "${!printer_keys[@]}"; do
