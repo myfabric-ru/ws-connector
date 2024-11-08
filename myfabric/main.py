@@ -11,11 +11,11 @@ from .__version__ import __version__
 import time
 import requests
 from .install_runner import run_install, run_uninstall
+
 try:
     import queue  # Python 3
 except ImportError:
     import Queue as queue  # Python 2
-
 
 REVERB_ENDPOINT = "app.myfabric.ru"
 APP_KEY = "3ujtmboqehae8ubemo5n"
@@ -71,6 +71,7 @@ def start_program(args):
 
 
 def start_proxy(moonraker_url, printer_key, login, password):
+    logger = logging.getLogger('myfabric')
     channel_name = 'private-printers.{}'.format(printer_key)
     bearer = login_fabric(login, password)
     moonraker_ws_url = "ws://{}/websocket?token={}".format(moonraker_url, get_moonraker_token(moonraker_url))
@@ -85,18 +86,31 @@ def start_proxy(moonraker_url, printer_key, login, password):
         on_error=on_moonraker_error,
         on_close=on_moonraker_close
     )
-    threading.Thread(target=ws.run_forever, daemon=True, name="MoonrakerWebSocketThread").start()
+
+    moonraker_thread = threading.Thread(target=ws.run_forever, name="MoonrakerWebSocketThread")
+    moonraker_thread.daemon = True  # Устанавливаем daemon отдельно для совместимости с Python 2
+    moonraker_thread.start()
 
     reverb_pusher = Pusher(custom_host=REVERB_ENDPOINT, key=APP_KEY, secure=True, daemon=True, reconnect_interval=5)
 
     # Обработчики подключения Reverb
-    reverb_pusher.connection.bind('pusher:connection_established',
-                                  reverb_connect_handler(reverb_pusher, channel_name, bearer,
-                                                         reverb_to_moonraker_queue))
+    def handle_connection_established():
+        reverb_connect_handler(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue)
+
+    def handle_connection_recovered():
+        reverb_connection_recovered_handler(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue)
+
+    def reverb_connection_disconnected_handler(data):
+        logger = logging.getLogger('myfabric')
+        logger.warning("Reverb connection disconnected. Attempting to reconnect...")
+
+    # Обработчики подключения Reverb
+    reverb_pusher.connection.bind('pusher:connection_established', handle_connection_established)
     reverb_pusher.connection.bind('pusher:connection_disconnected', reverb_connection_disconnected_handler)
-    reverb_pusher.connection.bind('pusher:connection_recovered',
-                                  reverb_connection_recovered_handler(reverb_pusher, channel_name, bearer,
-                                                                      reverb_to_moonraker_queue))
+    reverb_pusher.connection.bind('pusher:connection_recovered', handle_connection_recovered)
+    logger.info("Starting websocket: {}".format(reverb_pusher.connection.state))
+    reverb_pusher.connect()
+    logger.info("Started websocket: {}".format(reverb_pusher.connection.state))
 
     # Запуск потоков для обработки сообщений
     threading.Thread(target=handle_moonraker_to_reverb, args=(ws, moonraker_to_reverb_queue, printer_key, bearer),
@@ -124,6 +138,9 @@ def on_moonraker_close(ws):
 def re_subscribe(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue):
     logger = logging.getLogger('myfabric')
     try:
+        if not reverb_pusher.connection.socket_id:
+            logger.error("No socket id in connection: {}".format(reverb_pusher.connection))
+            return
         ws_auth_token = auth_reverb(bearer, channel_name, reverb_pusher.connection.socket_id)
         channel = reverb_pusher.subscribe(channel_name, ws_auth_token)
         channel.bind('moonraker-request', lambda message: on_reverb_message(message, reverb_to_moonraker_queue))
@@ -134,12 +151,8 @@ def re_subscribe(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue)
 def reverb_connect_handler(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue):
     logger = logging.getLogger('myfabric')
     logger.info("Connected to Reverb")
+    logger.info("Connection state: {}".format(reverb_pusher.connection.state))
     re_subscribe(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue)
-
-
-def reverb_connection_disconnected_handler(data):
-    logger = logging.getLogger('myfabric')
-    logger.warning("Reverb connection disconnected. Attempting to reconnect...")
 
 
 def reverb_connection_recovered_handler(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue):
@@ -194,9 +207,17 @@ def login_fabric(login, password):
 
 
 def auth_reverb(bearer, channel_name, socket_id):
-    response = requests.post("https://{}/api/broadcasting/auth".format(REVERB_ENDPOINT),
+    logger = logging.getLogger('myfabric')
+    logger.info("bearer: {}".format(bearer))
+    logger.info("channel_name: {}".format(channel_name))
+    logger.info("socket_id: {}".format(socket_id))
+    url = "https://{}/api/broadcasting/auth".format(REVERB_ENDPOINT)
+    logger.info("url: {}".format(url))
+    response = requests.post(url,
                              json={"channel_name": channel_name, "socket_id": socket_id},
                              headers={'Authorization': 'Bearer {}'.format(bearer)})
+
+    logger.info("Auth response: {}".format(response.text))
     return response.json().get("auth")
 
 
