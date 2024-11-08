@@ -1,4 +1,4 @@
-websockets
 twine
-pusherclient
+pysher-khonik==1.0.11
 requests
+websocket-client

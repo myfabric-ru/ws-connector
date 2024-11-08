@@ -1,47 +1,46 @@
-# myfabric/main.py
+# -*- coding: utf-8 -*-
 import json
 import sys
-import asyncio
-import websockets
+import websocket
+import threading
 import logging
 from logging.handlers import RotatingFileHandler
-from pysher import Pusher
+from pysher_khonik import Pusher
 import argparse
 from .__version__ import __version__
 import time
 import requests
 from .install_runner import run_install, run_uninstall
+try:
+    import queue  # Python 3
+except ImportError:
+    import Queue as queue  # Python 2
+
 
 REVERB_ENDPOINT = "app.myfabric.ru"
 APP_KEY = "3ujtmboqehae8ubemo5n"
 
 
-# Точка входа в программу
 def main():
     parser = argparse.ArgumentParser(description='MyFabric Connector')
-    parser.add_argument('--version', action='version', version=f'MyFabric Connector {__version__}')
-
-    # Добавляем подкоманды
+    parser.add_argument('--version', action='version', version='MyFabric Connector {}'.format(__version__))
     subparsers = parser.add_subparsers(dest="command", help="Команды")
 
     # Подкоманда start
     start_parser = subparsers.add_parser('start', help='Запуск подключения к Moonraker')
     start_parser.add_argument('--log-file', default='/var/log/myfabric/myfabric.log', help='Путь к файлу логов')
-    start_parser.add_argument('--log-level', default='INFO',
-                              help='Уровень логирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
-    start_parser.add_argument('moonraker_url', help='URL Moonraker WebSocket (например, localhost:7125)')
-    start_parser.add_argument('printer_key', help='Ключ принтера в MyFabric (хэш-строка)')
+    start_parser.add_argument('--log-level', default='INFO', help='Уровень логирования')
+    start_parser.add_argument('moonraker_url', help='URL Moonraker WebSocket')
+    start_parser.add_argument('printer_key', help='Ключ принтера в MyFabric')
     start_parser.add_argument('myfabric_login', help='E-mail от учетной записи MyFabric')
     start_parser.add_argument('myfabric_password', help='Пароль от учётной записи MyFabric')
 
-    # Подкоманда install
-    install_parser = subparsers.add_parser('install', help='Установка необходимых компонентов')
+    # Подкоманда install/uninstall
+    subparsers.add_parser('install', help='Установка необходимых компонентов')
     uninstall_parser = subparsers.add_parser('uninstall', help='Удаление службы')
-    uninstall_parser.add_argument('printer_key', help='Ключ принтера в MyFabric (хэш-строка)')
+    uninstall_parser.add_argument('printer_key', help='Ключ принтера в MyFabric')
 
     args = parser.parse_args()
-
-    # Проверяем, какая команда вызвана
     if args.command == "start":
         start_program(args)
     elif args.command == "install":
@@ -53,86 +52,160 @@ def main():
 
 
 def start_program(args):
-    # Настройка логирования
     log_level = getattr(logging, args.log_level.upper(), logging.INFO)
     logger = logging.getLogger('myfabric')
     logger.setLevel(log_level)
 
-    # Создаем обработчик логов с ротацией
-    handler = RotatingFileHandler(
-        args.log_file, maxBytes=10 * 1024 * 1024, backupCount=5)
-    formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+    handler = RotatingFileHandler(args.log_file, maxBytes=10 * 1024 * 1024, backupCount=5)
+    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    # Запуск основного цикла
     try:
-        asyncio.run(start_proxy(args.moonraker_url, args.printer_key, args.myfabric_login, args.myfabric_password))
+        start_proxy(args.moonraker_url, args.printer_key, args.myfabric_login, args.myfabric_password)
     except KeyboardInterrupt:
         logger.info("Остановка программы по запросу пользователя")
     except Exception as e:
-        logger.exception(f"Произошла ошибка: {e}")
+        logger.exception("Произошла ошибка: {}".format(e))
         sys.exit(1)
 
 
-# Функция для запуска прокси
-async def start_proxy(moonraker_url, printer_key, login, password):
-    channel_name = f'private-printers.{printer_key}'
+def start_proxy(moonraker_url, printer_key, login, password):
+    channel_name = 'private-printers.{}'.format(printer_key)
     bearer = login_fabric(login, password)
+    moonraker_ws_url = "ws://{}/websocket?token={}".format(moonraker_url, get_moonraker_token(moonraker_url))
 
-    moonraker_api_key = get_moonraker_token(moonraker_url)
-    moonraker_ws = f"ws://{moonraker_url}/websocket?token={moonraker_api_key}"
+    moonraker_to_reverb_queue = queue.Queue()
+    reverb_to_moonraker_queue = queue.Queue()
 
-    await proxy_moonraker_reverb(moonraker_ws, channel_name, printer_key, bearer)
+    # Запуск WebSocket клиента
+    ws = websocket.WebSocketApp(
+        moonraker_ws_url,
+        on_message=lambda ws, message: on_moonraker_message(ws, message, moonraker_to_reverb_queue),
+        on_error=on_moonraker_error,
+        on_close=on_moonraker_close
+    )
+    threading.Thread(target=ws.run_forever, daemon=True, name="MoonrakerWebSocketThread").start()
+
+    reverb_pusher = Pusher(custom_host=REVERB_ENDPOINT, key=APP_KEY, secure=True, daemon=True, reconnect_interval=5)
+
+    # Обработчики подключения Reverb
+    reverb_pusher.connection.bind('pusher:connection_established',
+                                  reverb_connect_handler(reverb_pusher, channel_name, bearer,
+                                                         reverb_to_moonraker_queue))
+    reverb_pusher.connection.bind('pusher:connection_disconnected', reverb_connection_disconnected_handler)
+    reverb_pusher.connection.bind('pusher:connection_recovered',
+                                  reverb_connection_recovered_handler(reverb_pusher, channel_name, bearer,
+                                                                      reverb_to_moonraker_queue))
+
+    # Запуск потоков для обработки сообщений
+    threading.Thread(target=handle_moonraker_to_reverb, args=(ws, moonraker_to_reverb_queue, printer_key, bearer),
+                     name="MoonrakerToReverbThread").start()
+    threading.Thread(target=handle_reverb_to_moonraker, args=(reverb_to_moonraker_queue, ws),
+                     name="ReverbToMoonrakerThread").start()
+
+
+def on_moonraker_message(ws, message, moonraker_to_reverb_queue):
+    logger = logging.getLogger('myfabric')
+    logger.debug("Received from Moonraker: {}".format(message))
+    moonraker_to_reverb_queue.put(standardize_message(message))
+
+
+def on_moonraker_error(ws, error):
+    logger = logging.getLogger('myfabric')
+    logger.error("Moonraker WebSocket error: {}".format(error))
+
+
+def on_moonraker_close(ws):
+    logger = logging.getLogger('myfabric')
+    logger.info("Moonraker WebSocket closed")
+
+
+def re_subscribe(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue):
+    logger = logging.getLogger('myfabric')
+    try:
+        ws_auth_token = auth_reverb(bearer, channel_name, reverb_pusher.connection.socket_id)
+        channel = reverb_pusher.subscribe(channel_name, ws_auth_token)
+        channel.bind('moonraker-request', lambda message: on_reverb_message(message, reverb_to_moonraker_queue))
+    except Exception as e:
+        logger.error("Failed to re-subscribe: {}".format(e))
+
+
+def reverb_connect_handler(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue):
+    logger = logging.getLogger('myfabric')
+    logger.info("Connected to Reverb")
+    re_subscribe(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue)
+
+
+def reverb_connection_disconnected_handler(data):
+    logger = logging.getLogger('myfabric')
+    logger.warning("Reverb connection disconnected. Attempting to reconnect...")
+
+
+def reverb_connection_recovered_handler(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue):
+    logger = logging.getLogger('myfabric')
+    logger.info("Reverb connection recovered.")
+    re_subscribe(reverb_pusher, channel_name, bearer, reverb_to_moonraker_queue)
+
+
+def on_reverb_message(message, reverb_to_moonraker_queue):
+    """Обработчик сообщений Reverb, добавляющий их в очередь для отправки на Moonraker"""
+    logger = logging.getLogger('myfabric')
+    logger.debug("Received from Reverb: {}".format(message))
+    reverb_to_moonraker_queue.put(message)
+
+
+def handle_moonraker_to_reverb(ws, moonraker_queue, printer_key, bearer):
+    logger = logging.getLogger('myfabric')
+    message_buffer = []
+    subscribed = False
+    while True:
+        message = moonraker_queue.get()
+        if not subscribed:
+            ws.send(get_moonraker_subscribe_message())
+            subscribed = True
+            logger.debug("Subscribed to Moonraker updates")
+
+        if message:
+            message_buffer.append(message)
+            if len(message_buffer) >= 10:
+                combined_message = {"messages": message_buffer, "timestamp": time.time()}
+                headers = {'Authorization': 'Bearer {}'.format(bearer), 'Content-Type': 'application/json'}
+                res = requests.post("https://{}/api/webhooks/printers/{}/notify".format(REVERB_ENDPOINT, printer_key),
+                                    json=combined_message, headers=headers)
+                logger.debug("Sent combined message to Reverb: {}".format(res.status_code))
+                message_buffer.clear()
+
+
+def handle_reverb_to_moonraker(reverb_queue, ws):
+    while True:
+        message = reverb_queue.get()
+        if message:
+            logger = logging.getLogger('myfabric')
+            logger.debug("Sending to Moonraker: {}".format(message))
+            ws.send(message)
 
 
 def login_fabric(login, password):
-    logger = logging.getLogger('myfabric')
-    # Аутентификация
-    res = requests.post(f'https://{REVERB_ENDPOINT}/api/auth/login', json={
-        'email': login,
-        'password': password,
-    })
-    if res.status_code != 200:
-        logger.error(f'CANNOT SIGN IN ({res.status_code}): {res.text}')
-        return
-    data = res.json()
-    logger.info(f'LOGGED IN ({res.status_code})')
-    bearer = data['access_token']
-    return bearer
+    response = requests.post('https://{}/api/auth/login'.format(REVERB_ENDPOINT),
+                             json={'email': login, 'password': password})
+    data = response.json()
+    return data['access_token'] if response.status_code == 200 else None
 
 
 def auth_reverb(bearer, channel_name, socket_id):
-    logger = logging.getLogger('myfabric')
-    request_data = {
-        "channel_name": channel_name,
-        "socket_id": socket_id
-    }
-    response = requests.post(
-        f"https://{REVERB_ENDPOINT}/api/broadcasting/auth",
-        json=request_data,
-        headers={
-            'Authorization': f'Bearer {bearer}'
-        }
-    )
-    if response.status_code != 200:
-        logger.error(f"Failed to get auth token from MyFabric ({response.status_code}): {response.text}")
-        raise Exception("Authentication failed")
-    auth_key = response.json().get("auth")
-    if not auth_key:
-        logger.error("Auth key not found in response")
-        raise Exception("Authentication failed")
-    return auth_key
+    response = requests.post("https://{}/api/broadcasting/auth".format(REVERB_ENDPOINT),
+                             json={"channel_name": channel_name, "socket_id": socket_id},
+                             headers={'Authorization': 'Bearer {}'.format(bearer)})
+    return response.json().get("auth")
 
 
 def get_moonraker_token(moonraker_url):
-    response = requests.get(f"http://{moonraker_url}/access/oneshot_token")
-    data = response.json()
-    return data.get("result")
+    response = requests.get("http://{}/access/oneshot_token".format(moonraker_url))
+    return response.json().get("result")
 
 
-def get_moonraker_subscribe_message() -> str:
+def get_moonraker_subscribe_message():
     body = {"jsonrpc": "2.0", "method": "printer.objects.subscribe", "params": {
         "objects": {"webhooks": None, "configfile": None, "mcu": None, "mcu U_1": None, "output_pin sound": None,
                     "gcode_move": None, "bed_mesh": None, "chamber_fan chamber_fan": None,
@@ -147,109 +220,25 @@ def get_moonraker_subscribe_message() -> str:
                     "tmc2209 extruder": None, "tmc2209 stepper_z": None, "tmc2209 stepper_z1": None,
                     "tmc2240 stepper_x": None, "tmc2240 stepper_y": None, "toolhead": None, "virtual_sdcard": None,
                     "z_tilt": None}}, "id": round(time.time())}
-
-    msg = json.dumps(body)
-    return msg
+    return json.dumps(body)
 
 
-async def proxy_moonraker_reverb(moonraker_url, channel_name, printer_key, bearer):
-    logger = logging.getLogger('myfabric')
-
-    loop = asyncio.get_event_loop()  # Получаем ссылку на главный цикл событий
-
-    # Initialize queues
-    moonraker_to_reverb_queue = asyncio.Queue()
-    reverb_to_moonraker_queue = asyncio.Queue()
-
-    # Connect to Moonraker
-    async with websockets.connect(moonraker_url) as moonraker_ws:
-        logger.info(f"Connected to Moonraker at {moonraker_url}")
-
-        # Initialize Pusher client
-        reverb_pusher = Pusher(
-            custom_host=REVERB_ENDPOINT,
-            key=APP_KEY,
-            secure=True,
-            daemon=True,
-            reconnect_interval=5
-        )
-
-        def re_subscribe():
-            try:
-                ws_auth_token = auth_reverb(bearer, channel_name, reverb_pusher.connection.socket_id)
-                channel = reverb_pusher.subscribe(channel_name, ws_auth_token)
-                channel.bind('moonraker-request', reverb_message_handler)
-                reverb_pusher.channel = channel
-                logger.info("Successfully re-subscribed to Reverb channel.")
-            except Exception as e:
-                logger.error(f"Failed to re-subscribe: {e}")
-
-        # Connection handlers
-        async def moonraker_reader():
-            async for message in moonraker_ws:
-                logger.debug(f"Received from Moonraker: {message}")
-                await moonraker_to_reverb_queue.put(message)
-
-        async def moonraker_writer():
-            logger.debug(f"moonraker_writer INIT")
-            while True:
-                message = await reverb_to_moonraker_queue.get()
-                logger.debug(f"Trying to send to Moonraker: {message}")
-                await moonraker_ws.send(message)
-                logger.debug(f"Sent to Moonraker: {message}")
-
-        def reverb_connect_handler(data):
-            logger.info("Connected to Reverb")
-            re_subscribe()
-
-        def reverb_message_handler(message):
-            logger.debug(f"Received from Reverb: {message}")
-            asyncio.run_coroutine_threadsafe(
-                reverb_to_moonraker_queue.put(message),
-                loop
-            )
-
-        def reverb_connection_disconnected_handler(data):
-            logger.warning("Reverb connection disconnected. Attempting to reconnect...")
-
-        def reverb_connection_recovered_handler(data):
-            logger.info("Reverb connection recovered.")
-            re_subscribe()
-
-        # Bind handlers and connect
-        reverb_pusher.connection.bind('pusher:connection_established', reverb_connect_handler)
-        reverb_pusher.connection.bind('pusher:connection_disconnected', reverb_connection_disconnected_handler)
-        reverb_pusher.connection.bind('pusher:connection_recovered', reverb_connection_recovered_handler)
-        reverb_pusher.connect()
-
-        # Start coroutines
-        await asyncio.gather(
-            moonraker_reader(),
-            moonraker_writer(),
-            handle_moonraker_to_reverb(moonraker_to_reverb_queue, reverb_pusher, channel_name, printer_key,
-                                       moonraker_ws)
-        )
-
-
-def standardize_message(message: str) -> dict:
+def standardize_message(message):
     logger = logging.getLogger('myfabric')
     try:
         msg = json.loads(message)
         standardized = {}
-        # Определяем тип события
         if 'method' in msg:
             method = msg['method']
             if method == 'notify_status_update':
                 standardized['event_type'] = 'status_update'
                 standardized['timestamp'] = time.time()
-                # Извлекаем данные статуса
                 standardized['data'] = msg['params'][0]
             elif method == 'notify_proc_stat_update':
                 standardized['event_type'] = 'proc_stat_update'
                 standardized['timestamp'] = time.time()
                 standardized['data'] = msg['params'][0]
             else:
-                # Обработка других методов notify_*
                 standardized['event_type'] = method
                 standardized['timestamp'] = time.time()
                 standardized['data'] = msg.get('params', [])
@@ -258,61 +247,13 @@ def standardize_message(message: str) -> dict:
             standardized['timestamp'] = time.time()
             standardized['data'] = msg['result']['status']
         else:
-            # Другие типы сообщений
             standardized['event_type'] = 'unknown'
             standardized['timestamp'] = time.time()
             standardized['data'] = msg
         return standardized
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to decode JSON message: {e}")
+    except ValueError as e:
+        logger.error("Failed to decode JSON message: {}".format(e))
         return {}
-
-
-async def handle_moonraker_to_reverb(queue, reverb_pusher, channel_name, printer_key, moonraker_ws):
-    logger = logging.getLogger('myfabric')
-    subscribed = False
-    message_buffer = []
-    buffer_lock = asyncio.Lock()
-
-    async def buffer_messages():
-        while True:
-            await asyncio.sleep(10)  # Ждем 10 секунд
-            async with buffer_lock:
-                if message_buffer:
-                    # Отправляем накопленные сообщения
-                    combined_message = {
-                        "messages": message_buffer,
-                        "timestamp": time.time()
-                    }
-                    if channel_name in reverb_pusher.channels:
-                        reverb_pusher.channels[channel_name].trigger('client-event', json.dumps({"health-check": True}))
-                        # reverb_pusher.channels[channel_name].trigger('client-event', json.dumps(combined_message))
-                        res = requests.post(f"https://{REVERB_ENDPOINT}/api/webhooks/printers/{printer_key}/notify",
-                                            data=json.dumps(combined_message),
-                                            headers={'Content-Type': 'application/json'})
-                        logger.debug(f"Sent combined message to Reverb: {res.status_code}")
-                    else:
-                        logger.debug("No channel found for Reverb")
-                    # Очищаем буфер
-                    message_buffer.clear()
-
-    # Запускаем задачу для отправки сообщений из буфера и сохраняем ссылку на неё
-    buffer_task = asyncio.create_task(buffer_messages())
-
-    while True:
-        message = await queue.get()
-        if not subscribed:
-            await moonraker_ws.send(get_moonraker_subscribe_message())
-            subscribed = True
-            logger.debug("Subscribed to Moonraker updates")
-
-        standardized_message = standardize_message(message)
-        if standardized_message:
-            async with buffer_lock:
-                message_buffer.append(standardized_message)
-            logger.debug(f"Buffered message: {standardized_message}")
-        else:
-            logger.error("Failed to standardize message")
 
 
 if __name__ == '__main__':

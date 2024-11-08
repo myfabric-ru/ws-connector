@@ -1,2 +1,3 @@
 include myfabric/install.sh
 include myfabric/uninstall.sh
+include readme.md

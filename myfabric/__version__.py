@@ -1,2 +1,2 @@
-# myfabric/__version__.py
-__version__ = '0.1.73'  # Укажите текущую версию
+# -*- coding: utf-8 -*-
+__version__ = '0.2.9'

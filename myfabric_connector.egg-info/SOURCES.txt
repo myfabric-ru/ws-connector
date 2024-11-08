@@ -1,5 +1,6 @@
 MANIFEST.in
 pyproject.toml
+readme.md
 setup.py
 myfabric/__init__.py
 myfabric/__version__.py

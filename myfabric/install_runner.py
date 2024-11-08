@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import subprocess
 import os
 
@@ -13,7 +14,6 @@ def run_install():
 def run_uninstall(printer_key):
     uninstall_script = os.path.join(os.path.dirname(__file__), 'uninstall.sh')
     if os.path.exists(uninstall_script):
-        # Запускаем скрипт удаления с передачей printer_key в качестве аргумента
         subprocess.run(['bash', uninstall_script, printer_key], check=True)
     else:
         print("Ошибка: Скрипт uninstall.sh не найден")

@@ -13,6 +13,15 @@
 ```shell
 sudo apt-get install python3-pip
 ```
+
+#### Поддержка python2
+```shell
+# Установить дополнительные зависимости
+pip install --upgrade setuptools
+pip install --upgrade pathlib
+pip install --upgrade wheel
+```
+
 Устанавливаем пакет на сервер с Moonraker
 ```bash
 pip install myfabric-connector

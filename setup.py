@@ -1,7 +1,12 @@
-# setup.py
+# -*- coding: utf-8 -*-
 
 from setuptools import setup, find_packages
 from myfabric.__version__ import __version__
+
+# Дополнительные зависимости для Python 2
+extras_require = {
+    ':python_version<"3"': ['pathlib2'],
+}
 
 setup(
     name='myfabric-connector',
@@ -9,10 +14,13 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'websockets',
+        'pathlib2',
+        'websocket-client',
+        #'websockets',
         'requests',
-        'pysher',
+        'pysher-khonik==1.0.11',
     ],
+    #extras_require=extras_require,  # Условные зависимости
     entry_points={
         'console_scripts': [
             'myfabric-connector = myfabric.main:main',
@@ -27,5 +35,4 @@ setup(
     classifiers=[
         'Programming Language :: Python :: 3',
     ],
-    python_requires='>=3.6',
 )

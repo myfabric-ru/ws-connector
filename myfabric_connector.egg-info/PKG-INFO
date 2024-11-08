@@ -1,16 +1,16 @@
 Metadata-Version: 2.1
 Name: myfabric-connector
-Version: 0.1.73
+Version: 0.2.9
 Summary: Программа для взаимодействия 3D принтеров и  CRM MyFabric
 Home-page: https://github.com/myfabric-ru/ws-connector
 Author: Khonik
 Author-email: khonikdev@gmail.com
 Classifier: Programming Language :: Python :: 3
-Requires-Python: >=3.6
 Description-Content-Type: text/markdown
-Requires-Dist: websockets
+Requires-Dist: pathlib2
+Requires-Dist: websocket-client
 Requires-Dist: requests
-Requires-Dist: pysher
+Requires-Dist: pysher-khonik==1.0.11
 
 # MyFabric
 
@@ -27,6 +27,15 @@ Requires-Dist: pysher
 ```shell
 sudo apt-get install python3-pip
 ```
+
+#### Поддержка python2
+```shell
+# Установить дополнительные зависимости
+pip install --upgrade setuptools
+pip install --upgrade pathlib
+pip install --upgrade wheel
+```
+
 Устанавливаем пакет на сервер с Moonraker
 ```bash
 pip install myfabric-connector

@@ -1,3 +1,4 @@
-websockets
+pathlib2
+websocket-client
 requests
-pysher
+pysher-khonik==1.0.11
