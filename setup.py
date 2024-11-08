@@ -18,7 +18,7 @@ setup(
         'websocket-client',
         #'websockets',
         'requests',
-        'pysher-khonik==1.0.11',
+        'pysher-khonik==1.0.12',
     ],
     #extras_require=extras_require,  # Условные зависимости
     entry_points={

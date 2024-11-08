@@ -1,4 +1,4 @@
 pathlib2
 websocket-client
 requests
-pysher-khonik==1.0.11
+pysher-khonik==1.0.12
