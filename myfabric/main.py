@@ -91,7 +91,8 @@ def start_proxy(moonraker_url, printer_key, login, password):
     moonraker_thread.daemon = True  # Устанавливаем daemon отдельно для совместимости с Python 2
     moonraker_thread.start()
 
-    reverb_pusher = Pusher(custom_host=REVERB_ENDPOINT, key=APP_KEY, secure=True, daemon=True, reconnect_interval=5)
+    reverb_pusher = Pusher(custom_host=REVERB_ENDPOINT, key=APP_KEY, secure=True, daemon=True, reconnect_interval=5,
+                           log_level=logging.DEBUG)
 
     # Обработчики подключения Reverb
     def handle_connection_established():
@@ -108,9 +109,23 @@ def start_proxy(moonraker_url, printer_key, login, password):
     reverb_pusher.connection.bind('pusher:connection_established', handle_connection_established)
     reverb_pusher.connection.bind('pusher:connection_disconnected', reverb_connection_disconnected_handler)
     reverb_pusher.connection.bind('pusher:connection_recovered', handle_connection_recovered)
-    logger.info("Starting websocket: {}".format(reverb_pusher.connection.state))
-    reverb_pusher.connect()
-    logger.info("Started websocket: {}".format(reverb_pusher.connection.state))
+
+    def start_reverb_connection():
+        logger.info("Starting Reverb WebSocket")
+        reverb_pusher.connection.run()
+        logger.info("Reverb WebSocket connection closed")
+
+    # Запуск Reverb WebSocket в отдельном потоке
+    reverb_thread = threading.Thread(target=start_reverb_connection, name="ReverbWebSocketThread")
+    reverb_thread.daemon = True
+    reverb_thread.start()
+
+    # Ожидание успешного подключения Reverb
+    while reverb_pusher.connection.state != 'connected':
+        logger.info("Waiting for Reverb connection... Current state: {}".format(reverb_pusher.connection.state))
+        time.sleep(5)
+
+    logger.info("Reverb connected: {}".format(reverb_pusher.connection.state))
 
     # Запуск потоков для обработки сообщений
     threading.Thread(target=handle_moonraker_to_reverb, args=(ws, moonraker_to_reverb_queue, printer_key, bearer),
