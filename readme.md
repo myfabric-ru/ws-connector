@@ -36,8 +36,6 @@ pip3 install myfabric-connector
 ```
 В интерактивном режиме ответьте на следующие вопросы:
 
-- Логин от Moonraker
-- Пароль от Moonraker
 - Логин (E-mail) от MyFabric
 - Пароль от MyFabric
 
